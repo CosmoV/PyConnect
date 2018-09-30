@@ -60,7 +60,6 @@ def isInterface(_class):
 			return False
 	return True
 
-
 def ExtendInterface(*toExtend):
 	
 	def interfaceExtender(_interface):
@@ -155,12 +154,12 @@ class ParentReferenceGetter():
 		return owner._parent
 
 			
-
 class IInterface:
 
 	master = 'master'
 	slave = 'slave'
 	neutral = 'neutral'
+	notIn = 'notIn'
 	_different = False
 	_type = neutral
 	_parent = object
@@ -197,9 +196,9 @@ class IInterface:
 			self.typeControlByInterface = set()
 		self.typeControlByInterface[str(interface)] = typeControl
 
-	def getInstanceTypeControlByInterface(self):
+	def getInstanceTypeControlByInterface(self, interface):
 		if not self.haveAttr('typeControlByInterface'):
-			self.typeControlByInterface = set()
+			self.typeControlByInterface = 43534
 		self.typeControlByInterface
 
 	def appendInterfaceRules(self, rules):
@@ -226,8 +225,8 @@ class IInterface:
 	
 
 	@classmethod
-	def isDifferent(self):
-		return _different
+	def isDifferent(cls):
+		return cls._different
 	
 	@classmethod
 	def Parent(cls):
@@ -236,7 +235,24 @@ class IInterface:
 	@classmethod
 	def typeControl(cls):
 		return cls._type
-	
+
+	def connectionIsAllowed(self, _class, interface):
+		return not (str(_class) in self.__dict__[str(self.__class__)] and interface in self.__dict__[str(self.__class__)][str(_class)])
+
+	def addUnsupported(self, _class, interface):
+		if not self.connectionIsAllowed(_class, interface):
+			if str(_class) not in self.__dict__:
+				self.__dict__[str(_class)] = set()
+
+			self.__dict__[str(_class)].add(interface)
+
+	def typeControlByInterface(self, interface):
+		if interface in self.interfacesSet:
+			return self.neutral 
+		if interface.Master in self.interfacesSet or interface.Slave in self.interfacesSet:
+			return interface.Master if interface.Master in self.interfacesSet else interface.Slave
+		return self.notIn
+
 
 	Master = TypeGetter(master)
 	Slave = TypeGetter(slave)
@@ -256,6 +272,8 @@ class Connector(IInterface):
 	def connectBySpecific(self, instanceA, instanceB, *interfaces):
 		pass
 
+
+
 	def connect(self, instanceA, instanceB):
 
 		def __check(instance):
@@ -265,6 +283,8 @@ class Connector(IInterface):
 				instance.implemented = dict()
 				for key in (str(_class) for _class in instance.interfacesSet):
 					instance.implemented[key] = False
+			if str(instance.__class__) not in instance.__dict__:
+				instance.__dict__[str(instance.__class__)] = dict()
 
 			return instance
 
@@ -281,9 +301,10 @@ class Connector(IInterface):
 		
 		self.instances[' '.join(str(instanceA) + str(time.time()))] = {'self' : instanceA}
 		self.instances[' '.join(str(instanceB) + str(time.time()))] = {'self' : instanceB}	
-
+		
 		for interface in interfaces:
-			self.mergeByInterface(instanceA, instanceB, interface)
+			if instanceA.connectionIsAllowed(instanceB.__class__, interface) and instanceB.connectionIsAllowed(instanceA.__class__, interface):
+				self.mergeByInterface(instanceA, instanceB, interface)
 
 
 	def mergeByInterface(self, instanceA, instanceB, interface):
@@ -292,23 +313,17 @@ class Connector(IInterface):
 		instanceB.implemented[str(interface)] = True
 
 		for sender, reciever in interface.simmetricRules.items():
-			print('Symmetric connect >> {sender} to {reciever}'.format(sender = sender, reciever = reciever))
 			self.concat(instanceA, instanceB, sender, reciever)
-			print('Symmetric connect >> {sender} to {reciever}'.format(sender = reciever, reciever = sender))
 			self.concat(instanceB, instanceA, sender, reciever)
 
 		if instanceA.isDifferent:
-			if instanceA != instanceB:
+			if instanceA.typeControl() != instanceB.typeControl():
 				master = instanceA if instanceA.typeControl() == instanceA.master else instanceB
 				slave = instanceA if instanceA.typeControl() == instanceA.slave else instanceB
-				print(master, slave)
 				for sender, reciever in interface.masterRules.items():
-					print('Master connect >> {sender} to {reciever}'.format(sender = sender, reciever = reciever))
 					self.concat(master, slave, sender, reciever)
 				for sender, reciever in interface.slaveRules.items():
-					print('Slave connect >> {sender} to {reciever}'.format(sender = sender, reciever = reciever))
 					self.concat(slave, master, sender, reciever)
-				#slave.doRequest()
 
 
 	def concat(self, instanceA, instanceB, nameFuncA, nameFuncB):
@@ -339,49 +354,11 @@ class Connector(IInterface):
 		self.disconnect()
 
 
-class SomeClass:
 
-	def __init__(self, instance):
-		self.instance = instance
+'''
 
-	def Iam(self):
-		return self
-
-	def merge(self):
-		
-		def packOrigin(original, handler):
-			def decorator(_origin = original, _handler = handler, *args, **kwargs):
-				return(_handler(_origin(*args, **kwargs)))
-			return decorator
-
-		self.instance.someFunc = packOrigin(self.instance.someFunc, self.handler)
-
-	def handler(self, data):
-		self.data = data
-		return True
-
-
-class IClientServer(IInterface):
-
-	simmetricRules = {
-		'send' : 'recieve'
-	}
-
-	masterRules = {
-		'sendCommand' : 'readCommand',
-		'sendResponse' : 'recieve'
-	}
-
-	slaveRules = {
-		'doRequest' : 'sendResponse'
-	}
-
-	def connect(self):
-		raise(ConnectorError.notImplement)
-
-
-#@Interface(IClientServer)
-class ClientServer(IClientServer):
+@Interface(IClientServer)
+class ClientServer():
 
 	def __init__(self, data):
 		self.data = data
@@ -443,46 +420,8 @@ class Client():
 	def recieve(self, data):
 		print('Client recieve %s ' % data)
 
+'''
 
-
-def SimpleDecorator(_class):
-
-	_class.someAttr += ' %s ' % _class
-	return _class
-
-
-@Interface(IClientServer.Slave)
-class D():
-	someAttr = '__init__ '
-	
-
-	@property
-	def someProperty(self):
-		return 5
-	
-
-@SimpleDecorator
-class E(D):
-	pass
-
-@SimpleDecorator
-class P(E):
-	pass
-
-
-class  A():
-	someValue = '/fdsfadjshfhafj;d'
-
-
-class G(A, P):
-	pass
-
-class SomeDescriptor():
-	def __get__(self, instance, owner):
-		print('dkfdshfdsifs')
-
-class Some():
-	someAttr = SomeDescriptor()
 
 if __name__ == '__main__':
 
@@ -495,7 +434,6 @@ if __name__ == '__main__':
 	client.send(5)
 	client.doRequest()
 	server.send(15)
-
 
 
 #print(G.interfacesSet)
