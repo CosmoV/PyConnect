@@ -20,7 +20,6 @@ class ConnectorError(Exception):
 	def notImplement(self):
 		return ConnectorError('Not implement')
 
-	
 	def __str__(self):
 		return '\n***\n<{0}>\n{1} >> {2}\n***'.format(self.message, 'Source' if not self.messageDetails else self.messageDetails,  self.body)
 
@@ -60,6 +59,7 @@ def isInterface(_class):
 			return False
 	return True
 
+
 def ExtendInterface(*toExtend):
 	
 	def interfaceExtender(_interface):
@@ -86,16 +86,6 @@ def Interface(*toInheritance):
 
 		PreWrapp = type(_class.__name__ + '__', (toInheritance), {})
 		Wrapped = type(PreWrapp.__name__ + 'Wrapped', (_class, PreWrapp), {})
-
-		def isInterface(_class):
-			if _class is IInterface:
-				return True
-			elif _class is object:
-				return False
-			for baseClass in _class.__bases__:
-				if not isInterface(baseClass):
-					return False
-			return True
 
 		try:
 			Wrapped.interfacesSet
@@ -153,7 +143,7 @@ class ParentReferenceGetter():
 
 		return owner._parent
 
-			
+		
 class IInterface:
 
 	master = 'master'
@@ -167,14 +157,11 @@ class IInterface:
 	def haveAttr(self, attrName):
 		return attrName in self.__dict__
 
-	@property
-	def allInterfaces(self):
+	def addAttr(self, attrName, value):
+		self.__dict__[attrName] = value
 
-		if not self.haveAttr('interfacesSet'):
-			self.__dict__['interfacesSet'] = f(self.__class__)
-
-		return self.__dict__['interfacesSet'] 
-
+	def toKey(self, source):
+		return str(source)
 
 	def appendAttrDict(self, attrName, data):
 		if not self.haveAttr(attrName):
@@ -237,14 +224,23 @@ class IInterface:
 		return cls._type
 
 	def connectionIsAllowed(self, _class, interface):
-		return not (str(_class) in self.__dict__[str(self.__class__)] and interface in self.__dict__[str(self.__class__)][str(_class)])
+		if not self.haveAttr('unsupportKey'):
+			self.addAttr('unsupportKey', self.toKey(self.__class__))
+			self.__dict__[self.unsupportKey] = dict()
+
+		key = self.toKey(_class)
+
+		return not (key in self.__dict__[self.unsupportKey] and interface in self.__dict__[self.unsupportKey][key])
+		
 
 	def addUnsupported(self, _class, interface):
-		if not self.connectionIsAllowed(_class, interface):
-			if str(_class) not in self.__dict__:
-				self.__dict__[str(_class)] = set()
+		if self.connectionIsAllowed(_class, interface):
+			key = self.toKey(_class)
+			if key not in self.__dict__[self.unsupportKey]:
+				self.__dict__[self.unsupportKey][key] = set()
 
-			self.__dict__[str(_class)].add(interface)
+			self.__dict__[self.unsupportKey][key].add(interface)
+
 
 	def typeControlByInterface(self, interface):
 		if interface in self.interfacesSet:
@@ -301,7 +297,7 @@ class Connector(IInterface):
 		
 		self.instances[' '.join(str(instanceA) + str(time.time()))] = {'self' : instanceA}
 		self.instances[' '.join(str(instanceB) + str(time.time()))] = {'self' : instanceB}	
-		
+
 		for interface in interfaces:
 			if instanceA.connectionIsAllowed(instanceB.__class__, interface) and instanceB.connectionIsAllowed(instanceA.__class__, interface):
 				self.mergeByInterface(instanceA, instanceB, interface)
@@ -353,108 +349,3 @@ class Connector(IInterface):
 	def __del__(self):
 		self.disconnect()
 
-
-
-'''
-
-@Interface(IClientServer)
-class ClientServer():
-
-	def __init__(self, data):
-		self.data = data
-
-	def setMessage(self, mess):
-		self.message = mess
-
-	def send(self, data):
-		print('Data %d has sended ' % data)
-		return data + 1
-
-	def recieve(self, data):
-		print('Recieved %d ' % data, self.message)
-
-@Interface(IClientServer.Master)
-class Server():
-
-	def __init__(self, data):
-		self.data = data
-
-	def setMessage(self, mess):
-		self.message = mess
-
-	def send(self, data):
-		print('Server send %d has sended ' % data)
-		return data + 1
-
-	def sendCommand(self, command):
-		return 'command >> {0}'.format(command)
-	
-	def recieve(self, data):
-		print('Server recieve %d ' % data)
-
-	def sendResponse(self, request):
-		print('Server accept >> {0}'.format(request))
-		return 'Server accept >> {0}'.format(request)
-
-
-@Interface(IClientServer.Slave)
-class Client():
-
-	def __init__(self, data):
-		self.data = data
-
-	def setMessage(self, mess):
-		self.message = mess
-
-	def send(self, data):
-		print('Client send %d ' % data)
-		return data
-
-	def readCommand(self, data):
-		print('eaa %d' % (data + 1))
-
-	def doRequest(self):
-		print('dsfdsfdsf')
-		return 'some request'
-
-	def recieve(self, data):
-		print('Client recieve %s ' % data)
-
-'''
-
-
-if __name__ == '__main__':
-
-	client = Client(5)
-	server = Server(10)
-	connector = Connector()
-
-	connector.connect(client, server)
-
-	client.send(5)
-	client.doRequest()
-	server.send(15)
-
-
-#print(G.interfacesSet)
-
-
-#print(client.allInterfaces)
-'''
-print(client.interfacesSet)
-print(server.interfacesSet)
-
-
-
-k = client.interfacesSet
-t = D.interfacesSet
-print(k is t)
-
-
-nector = Connector()
-
-connector.connect(server, client)
-
-
-server.send(1)
-client.send(342)'''

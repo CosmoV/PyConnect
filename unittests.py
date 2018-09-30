@@ -152,10 +152,7 @@ class ConnectorTest(unittest.TestCase):
 			connector = Connector()
 			server = Server()
 			client = Client('I\'m client')
-			client.__dict__[str(client.__class__)] = dict()
-			client.__dict__[str(client.__class__)][str(server.__class__)] = set()
-			client.__dict__[str(client.__class__)][str(server.__class__)].add(IObserver)
-
+			client.addUnsupported(Server, IObserver)
 			connector.connect(client, server)
 			client.send(5435)
 
