@@ -265,28 +265,31 @@ class Connector(IInterface):
 	def __init__(self):
 		self.instances = dict()
 
-	def connectBySpecific(self, instanceA, instanceB, *interfaces):
-		pass
+	def transfer(self, instance):
 
+		try:
+			instance.implemented		
+		except AttributeError as e:
+			instance.implemented = dict()
+			for key in (str(_class) for _class in instance.interfacesSet):
+				instance.implemented[key] = False
+				if str(instance.__class__) not in instance.__dict__:
+					instance.__dict__[str(instance.__class__)] = dict()
+		return instance
+
+
+	def connectBySpecific(self, instanceA, instanceB, *interfaces):
+
+		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
+		
+		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)		
 
 
 	def connect(self, instanceA, instanceB):
 
-		def __check(instance):
-			try:
-				instance.implemented
-			except AttributeError as e:
-				instance.implemented = dict()
-				for key in (str(_class) for _class in instance.interfacesSet):
-					instance.implemented[key] = False
-			if str(instance.__class__) not in instance.__dict__:
-				instance.__dict__[str(instance.__class__)] = dict()
-
-			return instance
-
-		instanceA, instanceB = __check(instanceA), __check(instanceB)
-
 		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
+		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)
+
 
 		getInterfaces = lambda k: set((interface if not interface.isDifferent else interface.Parent() for interface in k.interfacesSet))
 
@@ -335,7 +338,6 @@ class Connector(IInterface):
 		sender, reciever = eval('instanceA.' + nameFuncA), eval('instanceB.' + nameFuncB)
 		sender = packOrigin(sender, reciever)
 		exec('locals()["instanceA"].{0} = sender'.format(nameFuncA))
-
 
 	def checkInterfaceCompatibility(self, classA, classB, interface):
 		

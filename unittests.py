@@ -1,6 +1,121 @@
 import unittest
 from connectors import * 
 
+
+class IClientServer(IInterface):
+
+	simmetricRules = {
+		'send' : 'recieve'
+	}
+
+	masterRules = {
+		'sendCommand' : 'readCommand',
+		'sendResponse' : 'recieve'
+	}
+
+	slaveRules = {
+		'doRequest' : 'sendResponse'
+	}
+
+
+class IObserver(IInterface):
+
+	simmetricRules = {}
+
+	masterRules = {}
+
+	slaveRules = {
+		'sendInfo' : 'recieveInfo'
+	}
+
+
+@Interface(IObserver.Master)
+class Observer():
+
+	empty = 'empty'
+	server = 'server'
+	client = 'client'
+
+	def __init__(self, _client, _server):
+		self.handler = dict()
+		self.handler['serverRecieve'] =  lambda _self = self, key = 'serverRecieve', e = self.empty: self.add(key, e)
+		self.handler['serverReceivedRequest'] = lambda _self = self, key = 'serverRecievedRequest', e = self.empty: _self.add(key, e)
+		self.handler['serverSendCallCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
+		'''
+		self.handler['serverRecieve'] =  lambda _self = self, key = 'serverRecieve', e = self.empty: self.add(key, e)
+		self.handler['serverReceivedRequest'] = lambda _self = self, key = 'serverRecievedRequest', e = self.empty: _self.add(key, e)
+		self.handler['serverSendCallCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
+		'''
+		self.handler['sendCommandCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
+		self.handler['checkResponse'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
+		self._client = _client
+		self._server = _server
+
+		for key, value in self.handler.items():
+			value()
+
+	def add(self, key, value):
+		self.__dict__[key] = value
+		return True
+
+
+	def recieveInfo(self, message):
+		self._server.message = message
+		
+
+
+@Interface(IClientServer.Master, IObserver.Slave)
+class Server():
+
+	empty = 'empty'
+
+	def __init__(self, message):
+		self.message = message
+
+	def send(self, data):
+		return data
+
+	def sendCommand(self, command):
+		return command
+	
+	def recieve(self, message):
+		self.send(message)
+
+	def sendResponse(self, request):
+		return 'Server accept >> {0}'.format(request)
+
+	def sendInfo(self, *args, **kwargs):
+		return (args, kwargs)
+
+
+@Interface(IClientServer.Slave, IObserver.Slave)
+class Client:
+
+
+	def setMessage(self, mess):
+		self.message = mess
+
+	def send(self, message):
+		return message
+
+	def readCommand(self, data):
+		print('{0}'.format(data))
+
+	def doRequest(self,f):
+		return 'some request'
+
+	def recieve(self, message):
+		self.sendInfo(message)
+
+	def sendInfo(self, message):
+		return message
+
+	def checkAns(self, message):
+		self.message = message
+
+
+
+
 class ConnectorTest(unittest.TestCase):
 
 	def test_difference_references_to_interfaces_set(self):
@@ -51,110 +166,17 @@ class ConnectorTest(unittest.TestCase):
 
 	def test_connect_instances(self):
 
-
-			class IClientServer(IInterface):
-
-				simmetricRules = {
-					'send' : 'recieve'
-				}
-
-				masterRules = {
-					'sendCommand' : 'readCommand',
-					'sendResponse' : 'recieve'
-				}
-
-				slaveRules = {
-					'doRequest' : 'sendResponse'
-				}
-
-
-			class IObserver(IInterface):
-
-				simmetricRules = {}
-
-				masterRules = {}
-
-				slaveRules = {
-					'sendInfo' : 'recieveInfo'
-				}
-
-
-			@Interface(IObserver.Master)
-			class Observer():
-
-				empty = 'empty'
-				server = 'server'
-				client = 'client'
-
-				def __init__(self):
-					self.handler = dict()
-					self.handler['serverRecieve'] =  lambda _self = self, key = 'serverRecieve', e = _self.empty: self.add(key, e)
-					self.handler['serverReceivedRequest'] = lambda _self = self, key = 'serverRecieve', e = _self.empty: _self.add(key, e)
-					self.handler['serverSendCallCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
-					self.handler['sendCommandCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
-					self.handler['checkResponse'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
-
-					for key, value in self.handler:
-						value()
-
-				def add(self, key, value):
-					self.__dict__[key] = value
-					return true
-
-				def recieveInfo(self, funcName, value):
-					self.handler[funcName](value)
-
-
-			@Interface(IClientServer.Master, IObserver.Slave)
-			class Server():
-
-				empty = 'empty'
-
-				def __init__(self):
-					pass
-
-				def send(self, data):
-					return data
-
-				def sendCommand(self, command):
-					return command
-				
-				def recieve(self, data):
-					print('Server recieve %d ' % data)
-
-				def sendResponse(self, request):
-					print('Server accept >> {0}'.format(request))
-					return 'Server accept >> {0}'.format(request)
-
-
-			@Interface(IClientServer.Slave, IObserver.Slave)
-			class Client:
-
-				def __init__(self, data):
-					self.data = data
-
-				def setMessage(self, mess):
-					self.message = mess
-
-				def send(self, data):
-					return data
-
-				def readCommand(self, data):
-					print('eaa %d' % (data + 1))
-
-				def doRequest(self):
-					print('dsfdsfdsf')
-					return 'some request'
-
-				def recieve(self, data):
-					print('Client recieve %s ' % data)
-
 			connector = Connector()
-			server = Server()
-			client = Client('I\'m client')
+			server = Server('default')
+			client = Client()
+			observer = Observer(client, server)
 			client.addUnsupported(Server, IObserver)
 			connector.connect(client, server)
-			client.send(5435)
+			connector.connect(client, observer)
+			connector.connect(server, observer)
+			client.send('kepler')
+			self.assertEqual('kepler', server.message)
+
 
 
 if __name__ == '__main__':
