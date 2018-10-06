@@ -41,11 +41,6 @@ class Observer():
 		self.handler['serverRecieve'] =  lambda _self = self, key = 'serverRecieve', e = self.empty: self.add(key, e)
 		self.handler['serverReceivedRequest'] = lambda _self = self, key = 'serverRecievedRequest', e = self.empty: _self.add(key, e)
 		self.handler['serverSendCallCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
-		'''
-		self.handler['serverRecieve'] =  lambda _self = self, key = 'serverRecieve', e = self.empty: self.add(key, e)
-		self.handler['serverReceivedRequest'] = lambda _self = self, key = 'serverRecievedRequest', e = self.empty: _self.add(key, e)
-		self.handler['serverSendCallCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
-		'''
 		self.handler['sendCommandCount'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
 		self.handler['checkResponse'] = lambda _self = self, key = 'serverRecieve', e = 0: _self.add(key, e)
 		self._client = _client
@@ -91,7 +86,6 @@ class Server():
 @Interface(IClientServer.Slave, IObserver.Slave)
 class Client:
 
-
 	def setMessage(self, mess):
 		self.message = mess
 
@@ -112,8 +106,6 @@ class Client:
 
 	def checkAns(self, message):
 		self.message = message
-
-
 
 
 class ConnectorTest(unittest.TestCase):
@@ -166,7 +158,7 @@ class ConnectorTest(unittest.TestCase):
 
 	def test_connect_instances(self):
 
-			connector = Connector()
+			connector = InterfaceConnector()
 			server = Server('default')
 			client = Client()
 			observer = Observer(client, server)

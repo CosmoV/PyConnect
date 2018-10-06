@@ -1,6 +1,5 @@
-import inspect
-import re
 import time
+import re 
 
 class ConnectorError(Exception):
 
@@ -24,7 +23,6 @@ class ConnectorError(Exception):
 		return '\n***\n<{0}>\n{1} >> {2}\n***'.format(self.message, 'Source' if not self.messageDetails else self.messageDetails,  self.body)
 
 
-
 class InterfaceError(Exception):
 
 	def __init__(self, formatMessage, *args):
@@ -43,7 +41,6 @@ class InterfaceError(Exception):
 	@property
 	def extInterfaceError(self, _class):
 		return InterfaceError('Can\'t extend the interface, the passed class is not an interface {0}', _class)
-	
 	
 	def __str__(self):
 		return formatMessage.format(args)
@@ -65,9 +62,8 @@ def ExtendInterface(*toExtend):
 	def interfaceExtender(_interface):
 		nonlocal toExtend
 
-		class ExtInterface(_interface):
-			def __init__(self, *args, **kwargs):
-				super().__init__(*args, **kwargs)
+		PreWrapp = type(_interface.__name__ + '__', (toInheritance), {})
+		Wrapped = type(PreWrapp.__name__ + 'Wrapped', (_class, PreWrapp), {})
 
 		for _interface in (_class for _class in toExtend if isInterface(_class)):
 			ExtInterface.simmetricRules.update(_interface.simmetricRules)
@@ -77,6 +73,16 @@ def ExtendInterface(*toExtend):
 		return ExtInterface
 
 	return interfaceExtender
+
+
+def Connectable(_class):
+
+	for method in _class.__dict__:
+		if not re.fullmatch(r'__(\w*?)__', method):
+			exec('_class.{0}.connect = lambda value: print(value)'.format(method, method))
+
+	return _class
+
 
 
 def Interface(*toInheritance):
@@ -260,10 +266,47 @@ class IInterface:
 
 
 
-class Connector(IInterface):
+class SimpleConnector():
+
+	def connect(self, instanceA, instanceB, nameFuncA, nameFuncB):
+		
+		def packOrigin(_original, _handler):
+
+			def decorator(*args, original = _original, handler = _handler, **kwargs):
+
+				handler(original(*args, **kwargs))
+
+			return decorator
+
+		sender, reciever = eval('instanceA.' + nameFuncA), eval('instanceB.' + nameFuncB)
+		sender = packOrigin(sender, reciever)
+		exec('locals()["instanceA"].{0} = sender'.format(nameFuncA))
+
+
+
+
+class Connector:
+
+	def connect(self, instanceA, methodA, instanceB, methodB):
+
+		def packOrigin(_original, _handler):
+
+			def decorator(*args, original = _original, handler = _handler, **kwargs):
+
+				handler(original(*args, **kwargs))
+
+			return decorator
+
+		sender = packOrigin(methodA, methodB)
+		exec('locals()["instanceA"].{0} = sender'.format(methodA.__name__))
+
+
+
+class InterfaceConnector():
 
 	def __init__(self):
 		self.instances = dict()
+		self.connector = Connector()
 
 	def transfer(self, instance):
 
@@ -289,7 +332,6 @@ class Connector(IInterface):
 
 		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
 		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)
-
 
 		getInterfaces = lambda k: set((interface if not interface.isDifferent else interface.Parent() for interface in k.interfacesSet))
 
@@ -336,8 +378,7 @@ class Connector(IInterface):
 			return decorator
 
 		sender, reciever = eval('instanceA.' + nameFuncA), eval('instanceB.' + nameFuncB)
-		sender = packOrigin(sender, reciever)
-		exec('locals()["instanceA"].{0} = sender'.format(nameFuncA))
+		self.connector.connect(instanceA, sender, instanceB, reciever)
 
 	def checkInterfaceCompatibility(self, classA, classB, interface):
 		
@@ -350,4 +391,88 @@ class Connector(IInterface):
 
 	def __del__(self):
 		self.disconnect()
+
+
+
+class CallWpapper():
+
+	def __init__(self, instance, toWrapp):
+		self.original = toWrapp
+		self.instance = instance
+		self.connector = SimpleConnector() 
+		toWrapp.connect = self.connect
+		toWrapp.disconnect = self.disconnect
+		self.method = toWrapp
+
+	def connect(self, instance, method):
+		self.connector.connect(self.instance, )
+
+	def disconnect(self):
+		pass
+
+	def __call__(*args, **kwargs):
+		return self.original
+
+
+
+class CallTransferRegister():
+
+	def __init__(self):
+
+		self.instancesMethods = dict()
+
+		def callOriginal(_self = self):
+
+			def oneTimeCheck():
+				pass
+
+
+	def isRegistered(self, method):
+		return method in methods
+
+	def toRegister(self, instance):
+
+		self.instances.add(instance)
+
+	def unRegister(self, instance):
+		pass
+
+	def getInstance(self, instance, mehtod):
+
+		key = str(instance) + function.__name__
+		
+		if key  in self.instancesMethods:
+			pass
+		else:
+			self.instancesMethods[key] =  CallWpapper(instance, mehtod)
+
+		return 
+
+
+
+
+class CallTransferDescriptor():
+
+	def __init__(self, registerInstance, toWrapp):
+
+		self.original = toWrapp
+		self.register = registerInstance
+
+
+	def __get__(self, instance, owner):
+
+		return register.getInstance(instance, self.original)
+
+	def __call__(self, *args, **kwargs):
+
+		return self.original(*args, **kwargs)
+
+
+	def connect(self):
+		print('woah')
+
+	def disconnect(self):
+		pass
+
+
 
