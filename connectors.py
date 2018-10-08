@@ -1,6 +1,8 @@
 import time
 import re 
 
+from functools import reduce
+
 class ConnectorError(Exception):
 
 	def __init__(self, message = None, body = None, messageDetails = None):
@@ -23,456 +25,131 @@ class ConnectorError(Exception):
 		return '\n***\n<{0}>\n{1} >> {2}\n***'.format(self.message, 'Source' if not self.messageDetails else self.messageDetails,  self.body)
 
 
-class InterfaceError(Exception):
+class ConnectableFunctionality():
 
-	def __init__(self, formatMessage, *args):
-
-		self.formatMessage = formatMessage
-		self.args = args
-
-	@property
-	def defaulfException(self):
-		return ConnectorError()
-
-	@property
-	def notImplement(self):
-		return ConnectorError('Not implement')
-
-	@property
-	def extInterfaceError(self, _class):
-		return InterfaceError('Can\'t extend the interface, the passed class is not an interface {0}', _class)
-	
-	def __str__(self):
-		return formatMessage.format(args)
+	pass
 
 
-def isInterface(_class):
-	if _class is IInterface:
-		return True
-	elif _class is object:
-		return False
-	for baseClass in _class.__bases__:
-		if not isInterface(baseClass):
-			return False
-	return True
-
-
-def ExtendInterface(*toExtend):
-	
-	def interfaceExtender(_interface):
-		nonlocal toExtend
-
-		PreWrapp = type(_interface.__name__ + '__', (toInheritance), {})
-		Wrapped = type(PreWrapp.__name__ + 'Wrapped', (_class, PreWrapp), {})
-
-		for _interface in (_class for _class in toExtend if isInterface(_class)):
-			ExtInterface.simmetricRules.update(_interface.simmetricRules)
-			ExtInterface.masterRules.update(_interface.masterRules)
-			ExtInterface.slaveRules.update(_interface.slaveRules)
-
-		return ExtInterface
-
-	return interfaceExtender
-
+def getAllAttrs(_class):
+	if _class.__base__ == object:
+		return set((i for i in _class.__dict__ if not re.fullmatch(r'__(\w*?)__', i)))
+	else:
+		return reduce(lambda i, j: i.union(getAllAttrs(j)), (i for i in _class.__bases__), set())
+		
 
 def Connectable(_class):
 
-	for method in _class.__dict__:
-		if not re.fullmatch(r'__(\w*?)__', method):
-			exec('_class.{0}.connect = lambda value: print(value)'.format(method, method))
+	attrs = getAllAttrs(_class)
+
+	for attr in attrs:
+		exec('_class.{0} = CallTransferDescriptor(CallTransferRegister(), _class.{0})'.format(attr))
 
 	return _class
 
 
-
-def Interface(*toInheritance):
-
-	def interfaceDecorator(_class):
-		nonlocal toInheritance
-
-		PreWrapp = type(_class.__name__ + '__', (toInheritance), {})
-		Wrapped = type(PreWrapp.__name__ + 'Wrapped', (_class, PreWrapp), {})
-
-		try:
-			Wrapped.interfacesSet
-		except AttributeError as e:
-			Wrapped.interfacesSet = set()
-
-		for classReference in (__class for __class in toInheritance if isInterface(__class)):
-			Wrapped.interfacesSet.add(classReference)
-				
-		return Wrapped
-
-	return interfaceDecorator
-
-	
-class TypeGetter():
-	
-	def __init__(self, _type):
-		self._type = _type
-
-	def __get__(self, instance, owner):
-
-		try:	
-			master, slave = owner._master, owner._slave
-		except AttributeError as e:
-			self.createMaster(owner)
-			self.createSlave(owner)
-
-		return owner._master if self._type == IInterface.master else owner._slave
-
-
-	def transfer(self, owner, suffix):
-		
-		Wrapped = type(owner.__name__ + suffix, (owner,), {})
-		Wrapped._parent = owner
-		Wrapped._different = True
-		
-		return Wrapped
-
-	def createMaster(self, owner):
-
-		Wrapped = self.transfer(owner, 'Master')
-		Wrapped._type = Wrapped.master
-		owner._master = Wrapped
-		
-
-	def createSlave(self, owner):
-
-		Wrapped = self.transfer(owner, 'Slave')
-		Wrapped._type = Wrapped.slave
-		owner._slave = Wrapped
-
-class ParentReferenceGetter():
-
-	def __get__(self, instance, owner):
-
-		return owner._parent
-
-		
-class IInterface:
-
-	master = 'master'
-	slave = 'slave'
-	neutral = 'neutral'
-	notIn = 'notIn'
-	_different = False
-	_type = neutral
-	_parent = object
-
-	def haveAttr(self, attrName):
-		return attrName in self.__dict__
-
-	def addAttr(self, attrName, value):
-		self.__dict__[attrName] = value
-
-	def toKey(self, source):
-		return str(source)
-
-	def appendAttrDict(self, attrName, data):
-		if not self.haveAttr(attrName):
-			self.__dict__[attrName] = dict()
-
-		copy = self.__dict__[attrName].copy()
-
-		for key, value in rules.items():
-			if key not in self.__dict__[attrName]:
-				self.__dict__[attrName][key] = value
-			else:
-				self.__dict__[attrName] = copy
-				raise(ConnectorError('Interface collision by rule <{0}>'.format(key), (self.interfaceRules, value)))
-
-
-	def appendInstanceTypeControlByInterface(self, data):
-		typeControl, interface = data[0], data[1]
-		if not self.haveAttr('typeControlByInterface'):
-			self.typeControlByInterface = set()
-		self.typeControlByInterface[str(interface)] = typeControl
-
-	def getInstanceTypeControlByInterface(self, interface):
-		if not self.haveAttr('typeControlByInterface'):
-			self.typeControlByInterface = 43534
-		self.typeControlByInterface
-
-	def appendInterfaceRules(self, rules):
-		self.appendAttrDict('interfaceRules', rules)
-
-	def getRules(self):
-		if not self.haveAttr('interfaceRules'):
-			self.interfaceRules = dict()
-		return self.interfaceRules
-
-	def appendMasterInterfaceRules(self, rules):
-		self.appendAttrDict('interfaceMasterRules', rules)
-	
-	def getMasterInterfaceRules(self):
-		if not self.haveAttr('interfaceMasterRules'):
-			self.interfaceMasterRules = dict()
-
-	def appendSlaveInterfaceRules(self, rules):
-		self.appendAttrDict('interfaceSlaveRules', rules)
-	
-	def getSlaveInterfaceRules(self):
-		if not self.haveAttr('interfaceMasterRules'):
-			self.interfaceMasterRules = dict()
-	
-
-	@classmethod
-	def isDifferent(cls):
-		return cls._different
-	
-	@classmethod
-	def Parent(cls):
-		return cls._parent
-
-	@classmethod
-	def typeControl(cls):
-		return cls._type
-
-	def connectionIsAllowed(self, _class, interface):
-		if not self.haveAttr('unsupportKey'):
-			self.addAttr('unsupportKey', self.toKey(self.__class__))
-			self.__dict__[self.unsupportKey] = dict()
-
-		key = self.toKey(_class)
-
-		return not (key in self.__dict__[self.unsupportKey] and interface in self.__dict__[self.unsupportKey][key])
-		
-
-	def addUnsupported(self, _class, interface):
-		if self.connectionIsAllowed(_class, interface):
-			key = self.toKey(_class)
-			if key not in self.__dict__[self.unsupportKey]:
-				self.__dict__[self.unsupportKey][key] = set()
-
-			self.__dict__[self.unsupportKey][key].add(interface)
-
-
-	def typeControlByInterface(self, interface):
-		if interface in self.interfacesSet:
-			return self.neutral 
-		if interface.Master in self.interfacesSet or interface.Slave in self.interfacesSet:
-			return interface.Master if interface.Master in self.interfacesSet else interface.Slave
-		return self.notIn
-
-
-	Master = TypeGetter(master)
-	Slave = TypeGetter(slave)
-
-	masterRules = property(getMasterInterfaceRules, appendMasterInterfaceRules)
-	slaveRules = property(getSlaveInterfaceRules, appendSlaveInterfaceRules)
-	simmetricRules = property(getRules, appendInterfaceRules)
-	typeInstance = property(getInstanceTypeControlByInterface, appendInstanceTypeControlByInterface)
-
-
-
-class SimpleConnector():
-
-	def connect(self, instanceA, instanceB, nameFuncA, nameFuncB):
-		
-		def packOrigin(_original, _handler):
-
-			def decorator(*args, original = _original, handler = _handler, **kwargs):
-
-				handler(original(*args, **kwargs))
-
-			return decorator
-
-		sender, reciever = eval('instanceA.' + nameFuncA), eval('instanceB.' + nameFuncB)
-		sender = packOrigin(sender, reciever)
-		exec('locals()["instanceA"].{0} = sender'.format(nameFuncA))
-
-
-
-
 class Connector:
 
-	def connect(self, instanceA, methodA, instanceB, methodB):
+	def getWrapper(self):
+		
+		def packOrigin(original, handler):
 
-		def packOrigin(_original, _handler):
+			def decorator(*args, __original = original, __handler = handler, **kwargs):
 
-			def decorator(*args, original = _original, handler = _handler, **kwargs):
+				__handler(__original(*args, **kwargs))
 
-				handler(original(*args, **kwargs))
+			decorator.original = original
 
 			return decorator
 
-		sender = packOrigin(methodA, methodB)
+		return packOrigin
+
+	def connect(self, instanceA, methodA, instanceB, methodB):
+		sender = self.getWrapper()(methodA, methodB)
 		exec('locals()["instanceA"].{0} = sender'.format(methodA.__name__))
 
-
-
-class InterfaceConnector():
-
-	def __init__(self):
-		self.instances = dict()
-		self.connector = Connector()
-
-	def transfer(self, instance):
-
-		try:
-			instance.implemented		
-		except AttributeError as e:
-			instance.implemented = dict()
-			for key in (str(_class) for _class in instance.interfacesSet):
-				instance.implemented[key] = False
-				if str(instance.__class__) not in instance.__dict__:
-					instance.__dict__[str(instance.__class__)] = dict()
-		return instance
-
-
-	def connectBySpecific(self, instanceA, instanceB, *interfaces):
-
-		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
-		
-		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)		
-
-
-	def connect(self, instanceA, instanceB):
-
-		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
-		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)
-
-		getInterfaces = lambda k: set((interface if not interface.isDifferent else interface.Parent() for interface in k.interfacesSet))
-
-		interfaces = getInterfaces(instanceA).intersection(getInterfaces(instanceB))
-
-		if not len(interfaces):
-			raise(ConnectorError('Compatibility interfaces not found', (instanceA, instanceB), 'Classes'))
-		
-		self.instances[' '.join(str(instanceA) + str(time.time()))] = {'self' : instanceA}
-		self.instances[' '.join(str(instanceB) + str(time.time()))] = {'self' : instanceB}	
-
-		for interface in interfaces:
-			if instanceA.connectionIsAllowed(instanceB.__class__, interface) and instanceB.connectionIsAllowed(instanceA.__class__, interface):
-				self.mergeByInterface(instanceA, instanceB, interface)
-
-
-	def mergeByInterface(self, instanceA, instanceB, interface):
-
-		instanceA.implemented[str(interface)] = True
-		instanceB.implemented[str(interface)] = True
-
-		for sender, reciever in interface.simmetricRules.items():
-			self.concat(instanceA, instanceB, sender, reciever)
-			self.concat(instanceB, instanceA, sender, reciever)
-
-		if instanceA.isDifferent:
-			if instanceA.typeControl() != instanceB.typeControl():
-				master = instanceA if instanceA.typeControl() == instanceA.master else instanceB
-				slave = instanceA if instanceA.typeControl() == instanceA.slave else instanceB
-				for sender, reciever in interface.masterRules.items():
-					self.concat(master, slave, sender, reciever)
-				for sender, reciever in interface.slaveRules.items():
-					self.concat(slave, master, sender, reciever)
-
-
-	def concat(self, instanceA, instanceB, nameFuncA, nameFuncB):
-		
-		def packOrigin(_original, _handler):
-
-			def decorator(*args, original = _original, handler = _handler, **kwargs):
-
-				handler(original(*args, **kwargs))
-
-			return decorator
-
-		sender, reciever = eval('instanceA.' + nameFuncA), eval('instanceB.' + nameFuncB)
-		self.connector.connect(instanceA, sender, instanceB, reciever)
-
-	def checkInterfaceCompatibility(self, classA, classB, interface):
-		
-		for i in ((issubclass(classA, interface), classA), (issubclass(classB, interface), classB)):
-		 	if not i[0]:
-		 		raise(ConnectorError('Interface {0} not found'.format(interface), i[1], 'Class'))
-
 	def disconnect(self):
-		pass
+		instance = self.instance
+		exec('locals()["instance"].{0} = self.original'.format(self.original.__name__))
 
-	def __del__(self):
-		self.disconnect()
-
-
+		
 
 class CallWpapper():
 
 	def __init__(self, instance, toWrapp):
-		self.original = toWrapp
+		
+		self.toWrapp = toWrapp
 		self.instance = instance
-		self.connector = SimpleConnector() 
-		toWrapp.connect = self.connect
-		toWrapp.disconnect = self.disconnect
-		self.method = toWrapp
+		self.connector = Connector() 
+		self.preConnect()
 
-	def connect(self, instance, method):
-		self.connector.connect(self.instance, )
+	def preConnect(self):
+
+		def instanceReferenceSaver(self, toWrapp):
+
+			def decorator(*args, __self = self, __wrapped = toWrapp, **kwargs):
+
+				return __wrapped(__self, *args, **kwargs)
+
+			return decorator
+
+		self.wrapped = instanceReferenceSaver(self.instance, self.toWrapp)
+		self.wrapped.connect = self.connect
+		self.wrapped.disconnect = self.disconnect
+
+	def connect(self, handler):
+		self.wrapped = self.connector.getWrapper()(self.wrapped, handler)
 
 	def disconnect(self):
-		pass
+		self.wrapped = self.wrapped.original
 
-	def __call__(*args, **kwargs):
-		return self.original
+	def update(self, toWrapp):
+		self.toWrapp = toWrapp
+		self.preConnect()
+
+	def __call__(self, *args, **kwargs):
+		return self.wrapped(*args, **kwargs)
 
 
 
 class CallTransferRegister():
 
 	def __init__(self):
+		self.instances = dict()
 
-		self.instancesMethods = dict()
+	def isRegistered(self, instance):
+		return instance in self.instances
 
-		def callOriginal(_self = self):
-
-			def oneTimeCheck():
-				pass
-
-
-	def isRegistered(self, method):
-		return method in methods
-
-	def toRegister(self, instance):
-
-		self.instances.add(instance)
+	def toRegister(self, instance, method):
+		self.instances[instance] = CallWpapper(instance, method)
 
 	def unRegister(self, instance):
 		pass
 
-	def getInstance(self, instance, mehtod):
+	def getWrapped(self, instance):
+		return self.instances[instance]
 
-		key = str(instance) + function.__name__
 		
-		if key  in self.instancesMethods:
-			pass
-		else:
-			self.instancesMethods[key] =  CallWpapper(instance, mehtod)
-
-		return 
-
-
-
 
 class CallTransferDescriptor():
 
-	def __init__(self, registerInstance, toWrapp):
+	_connectorDescriptor = True
 
-		self.original = toWrapp
+	def __init__(self, registerInstance, original):
+		self.original = original
 		self.register = registerInstance
 
+	def toRegister(self, instance):
+		if not self.register.isRegistered(instance):
+			self.register.toRegister(instance, self.original)
 
 	def __get__(self, instance, owner):
+		self.toRegister(instance)
+		return self.register.getWrapped(instance)
 
-		return register.getInstance(instance, self.original)
+	def __set__(self, instance, value):
+		self.toRegister(instance)
+		self.register.update(value)
 
 	def __call__(self, *args, **kwargs):
-
-		return self.original(*args, **kwargs)
-
-
-	def connect(self):
-		print('woah')
-
-	def disconnect(self):
-		pass
-
-
+		return self.wrapped(*args, **kwargs)
 
