@@ -53,9 +53,9 @@ def Connectable(_class):
 	_class.__connectable = True
 	attrs = getAllAttrs(_class)
 
-	print(attrs)
 	for attr in attrs:
-		exec('_class.{0} = CallTransferDescriptor(CallTransferRegister(), _class.{0})'.format(attr))
+		if callable(eval('_class.{0}'.format(attr))):
+			exec('_class.{0} = CallTransferDescriptor(CallTransferRegister(), _class.{0})'.format(attr))
 
 	return _class
 
@@ -64,20 +64,22 @@ class Connector:
 
 	def getWrapper(self):
 		
-		def packOrigin(original, handler):
+		def packOrigin(original, handler, transfer = False):
 
-			def withoutArgsDecorator(*args, __original = original, __handler = handler, **kwargs):
-				__original(*args, **kwargs)
-				__handler()
+			toTransfer, original = (True, transfer) if callable(transfer) else (transfer, original)
 
-			def decorator(*args, __original = original, __handler = handler, **kwargs):
+			def decorator(*args, __handler = handler, **kwargs):
+
+				__handler(*args, **kwargs)
+
+			def transferDecorator(*args, __original = original, __handler = handler, **kwargs):
 
 				__handler(__original(*args, **kwargs))
 
-			withoutArgsDecorator.original = original
 			decorator.original = original
+			transferDecorator.original = original
 
-			return decorator if str(inspect.signature(handler)) != '()' else withoutArgsDecorator
+			return transferDecorator if toTransfer else decorator
 
 		return packOrigin
 
@@ -170,3 +172,17 @@ class CallTransferDescriptor():
 
 	def __call__(self, *args, **kwargs):
 		return self.wrapped(*args, **kwargs)
+
+
+
+class SimpleDescriptor():
+
+	def __get__(self, instance, owner):
+		return lambda i: i
+
+class A():
+
+	attr = SimpleDescriptor()
+
+	def bla(self):
+		pass
