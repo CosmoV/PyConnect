@@ -1,5 +1,6 @@
 import time
 import re 
+import inspect
 
 from functools import reduce
 
@@ -30,17 +31,29 @@ class ConnectableFunctionality():
 	pass
 
 
+def isConnectable(_class):
+	try:
+		exec('_class.__connectable{0}'.format(_class.__name__))
+		return True
+	except AttributeError as e:
+		return False
+
+def getAttrs(_class):
+	return set((i for i in _class.__dict__ if not re.fullmatch(r'__(\w*?)', i)))
+
 def getAllAttrs(_class):
 	if _class.__base__ == object:
-		return set((i for i in _class.__dict__ if not re.fullmatch(r'__(\w*?)__', i)))
+		return getAttrs(_class)
 	else:
-		return reduce(lambda i, j: i.union(getAllAttrs(j)), (i for i in _class.__bases__), set())
+		return reduce(lambda i, j: i.union(getAllAttrs(j)), (i for i in _class.__bases__), set()).union(getAttrs(_class))
 		
 
 def Connectable(_class):
 
+	_class.__connectable = True
 	attrs = getAllAttrs(_class)
 
+	print(attrs)
 	for attr in attrs:
 		exec('_class.{0} = CallTransferDescriptor(CallTransferRegister(), _class.{0})'.format(attr))
 
@@ -53,13 +66,18 @@ class Connector:
 		
 		def packOrigin(original, handler):
 
+			def withoutArgsDecorator(*args, __original = original, __handler = handler, **kwargs):
+				__original(*args, **kwargs)
+				__handler()
+
 			def decorator(*args, __original = original, __handler = handler, **kwargs):
 
 				__handler(__original(*args, **kwargs))
 
+			withoutArgsDecorator.original = original
 			decorator.original = original
 
-			return decorator
+			return decorator if str(inspect.signature(handler)) != '()' else withoutArgsDecorator
 
 		return packOrigin
 
@@ -152,4 +170,3 @@ class CallTransferDescriptor():
 
 	def __call__(self, *args, **kwargs):
 		return self.wrapped(*args, **kwargs)
-

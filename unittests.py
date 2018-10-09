@@ -153,7 +153,26 @@ class ConnectorTest(unittest.TestCase):
 		a.sendInfo('alcor')
 		self.assertEqual('alcor', b.info)
 
+	def test_connect_with_function_without_args(self):
 
+		@Connectable
+		class A_connect_with_function_without_args():
+			
+			def info(self):
+				pass
+
+		class B_connect_with_function_without_args():
+			
+			def __init__(self):
+				self.value = 0
+
+			def call(self):
+				self.value = 11235
+
+		a, b = A_connect_with_function_without_args(), B_connect_with_function_without_args()
+		a.info.connect(b.call)
+		a.info()
+		self.assertEqual(11235, b.value)
 
 
 	def test_difference_references_to_interfaces_set(self):
