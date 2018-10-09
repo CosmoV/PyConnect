@@ -28,12 +28,12 @@ class ConnectorTests(unittest.TestCase):
 	def test_connectable_decorator(self):
 		
 		@Connectable
-		class A_test_connectable_decorator():
+		class A():
 	
 			def sendInfo(self, info):
 				return info
 
-		class B_test_connectable_decorator():
+		class B():
 
 			def __init__(self):
 				self.info = 'empty'
@@ -41,7 +41,7 @@ class ConnectorTests(unittest.TestCase):
 			def infoReader(self, info):
 				b.info = info
 
-		a, b = A_test_connectable_decorator(), B_test_connectable_decorator()
+		a, b = A(), B()
 
 		a.sendInfo.connect(b.infoReader)
 		a.sendInfo('alcor')
@@ -50,12 +50,12 @@ class ConnectorTests(unittest.TestCase):
 	def test_connect_with_function_without_args(self):
 
 		@Connectable
-		class A_connect_with_function_without_args():
+		class A():
 			
 			def info(self):
 				pass
 
-		class B_connect_with_function_without_args():
+		class B():
 			
 			def __init__(self):
 				self.value = 0
@@ -63,10 +63,44 @@ class ConnectorTests(unittest.TestCase):
 			def call(self):
 				self.value = 11235
 
-		a, b = A_connect_with_function_without_args(), B_connect_with_function_without_args()
+		a, b = A(), B()
 		a.info.connect(b.call)
 		a.info()
 		self.assertEqual(11235, b.value)
+
+	def test_base_connectable_decorator_finctionality(self):
+
+		@Connectable
+		class A():
+			
+			def iTransfer(self, value):
+				return value + '_gamma'
+
+		class B():
+
+			def __init__(self):
+				self.value = 'beta'
+
+			def iReader(self, value):
+				self.value = value
+
+		a, b = A(), B()
+
+		a.iTransfer.connect(b.iReader)
+		a.iTransfer('alpha')
+		a.iTransfer.disconnect()
+		self.assertEqual('alpha', b.value)
+
+		b.value = 'beta'
+		a.iTransfer.connect(b.iReader)
+		a.iTransfer.disconnect()
+		a.iTransfer('alpha')
+		self.assertEqual('beta', b.value)
+
+		b.value = 'beta'
+		a.iTransfer.connect(b.iReader, transfer = True)
+		a.iTransfer('alpha')
+		self.assertEqual('alpha_gamma', b.value)
 
 
 if __name__ == '__main__':

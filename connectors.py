@@ -91,7 +91,6 @@ class Connector:
 		instance = self.instance
 		exec('locals()["instance"].{0} = self.original'.format(self.original.__name__))
 
-		
 
 class CallWpapper():
 
@@ -116,11 +115,11 @@ class CallWpapper():
 		self.wrapped.connect = self.connect
 		self.wrapped.disconnect = self.disconnect
 
-	def connect(self, handler):
-		self.wrapped = self.connector.getWrapper()(self.wrapped, handler)
+	def connect(self, handler, transfer = False):
+		self.wrapped = self.connector.getWrapper()(self.wrapped, handler, transfer)
 
 	def disconnect(self):
-		self.wrapped = self.wrapped.original
+		self.wrapped = lambda *args, **kwargs : self.toWrapp(self.instance, *args, **kwargs)
 
 	def update(self, toWrapp):
 		self.toWrapp = toWrapp
@@ -128,7 +127,6 @@ class CallWpapper():
 
 	def __call__(self, *args, **kwargs):
 		return self.wrapped(*args, **kwargs)
-
 
 
 class CallTransferRegister():
@@ -149,7 +147,6 @@ class CallTransferRegister():
 		return self.instances[instance]
 
 		
-
 class CallTransferDescriptor():
 
 	_connectorDescriptor = True
@@ -173,16 +170,3 @@ class CallTransferDescriptor():
 	def __call__(self, *args, **kwargs):
 		return self.wrapped(*args, **kwargs)
 
-
-
-class SimpleDescriptor():
-
-	def __get__(self, instance, owner):
-		return lambda i: i
-
-class A():
-
-	attr = SimpleDescriptor()
-
-	def bla(self):
-		pass
