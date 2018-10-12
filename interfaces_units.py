@@ -118,14 +118,14 @@ class InterfaceTests(unittest.TestCase):
 			pass
 
 		@Interface(SimpleInterface)
-		class A_difference():
+		class A():
 			pass
 
 		@Interface(SimpleInterface)
-		class B_difference():
+		class B():
 			pass
 
-		self.assertFalse(A_difference.interfacesSet is B_difference.interfacesSet)
+		self.assertFalse(A.interfacesSet is B.interfacesSet)
 
 
 	def test_check_master_slave_inheritance(self):
@@ -136,24 +136,24 @@ class InterfaceTests(unittest.TestCase):
 			pass
 
 		@Interface(SimpleInterface.Master)
-		class A_check_ms():
+		class A():
 			pass
 
 		@Interface(SimpleInterface.Slave)
-		class B_check_ms():
+		class B():
 			pass
 
 		@Interface(SimpleInterface.Master)
-		class C_check_ms():
+		class C():
 			pass	
 				
-		c_set, a_set, b_set  = C_check_ms.interfacesSet.copy(), A_check_ms.interfacesSet.copy(), B_check_ms.interfacesSet.copy()
+		c_set, a_set, b_set  = C.interfacesSet.copy(), A.interfacesSet.copy(), B.interfacesSet.copy()
 		
 		self.assertTrue(len(c_set.intersection(b_set)) == 0)
 
 		self.assertTrue(len(c_set.intersection(a_set)) == 1 and (a_set.pop() is c_set.pop()))
 
-		self.assertIs(SimpleInterface.Master, C_check_ms.interfacesSet.copy().pop())
+		self.assertIs(SimpleInterface.Master, C.interfacesSet.copy().pop())
 
 
 	def test_connect_instances(self):
