@@ -3,6 +3,7 @@ import re
 import inspect
 
 from functools import reduce
+from collections import namedtuple
 
 class ConnectorError(Exception):
 
@@ -91,16 +92,12 @@ class CallWpapper():
 
 	def __init__(self, instance, toWrapp):
 		
-		def sendSignals(*args, __self = self, **kwargs):
-
-				for subscriber in __self.subscribers:
-
-					subscriber(*args, **kwargs)
-
-		self.sendSignals = sendSignals
 		self.toWrapp = toWrapp
+		self.connection = namedtuple('connection', 'wrapped handler transfer')
 		self.__name__ = toWrapp.__name__
 		self.instance = instance
+		self.call = self.defaultCall
+		self.callConnect = self.undoFirstConnection
 		self.connected = set()
 		self.subscribers = set()
 		self.connector = Connector() 
@@ -117,11 +114,9 @@ class CallWpapper():
 			return decorator
 
 		self.wrapped = wrappInstance(self.instance, self.toWrapp) if bindInstance else lambda *args, **kwargs : self.toWrapp(*args, **kwargs)
-		self.wrapped.connect = self.connect
-		self.wrapped.disconnect = self.disconnect
 
 	def connect(self, handler, transfer = False):
-		self.wrapped = self.connector.getWrapper()(self.wrapped, handler, transfer)
+		self.callConnect(handler, transfer)
 		return self
 
 	def addSubscriber(self, *someCallables):
@@ -132,7 +127,34 @@ class CallWpapper():
 		self.subscribers.difference_update(subscribers)
 
 	def disconnect(self):
-		self.wrapped = lambda *args, **kwargs : self.toWrapp(self.instance, *args, **kwargs)
+		self.callConnect = self.undoFirstConnection
+		self.connected = set((self.wrapped,))
+		self.subscribers = set()
+
+	def callConnections(self, *args, **kwargs):
+		for wrapped in self.connected:
+			wrapped(*args, **kwargs)
+
+	def callSubscribers(self, *args, **kwargs):
+		for subscriber in self.subscribers:
+			subscriber(*args, **kwargs)
+
+	def defaultCall(self, *args, **kwargs):
+		return self.wrapped(*args, **kwargs)
+
+	def wrappedCall(self,*args, **kwargs):
+		self.callConnections(*args, **kwargs)
+		self.callSubscribers(*args, **kwargs)
+
+	def undoFirstConnection(self, handler, transfer):
+		self.callConnect  = self._connect
+		self.callConnect(handler, transfer)
+		self.call = self.wrappedCall
+		return self
+
+	def _connect(self, handler, transfer):
+		self.connected.add(self.connector.getWrapper()(self.wrapped, handler, transfer))
+		return self
 
 	def bind(self, method):
 		self.update(method)
@@ -142,9 +164,7 @@ class CallWpapper():
 		self.preConnect(bindInstance)
 
 	def __call__(self, *args, **kwargs):
-		value = self.wrapped(*args, **kwargs)
-		self.sendSignals(*args, **kwargs)
-		return value
+		return self.call(*args, **kwargs)
 
 
 class CallTransferRegister():
