@@ -168,6 +168,10 @@ class InterfaceTests(unittest.TestCase):
 			connector.connect(server, observer)
 			client.send('kepler')
 			self.assertEqual('kepler', server.message)
+			connector.disconnect(client, server)
+			client.send('wezen')
+			self.assertEqual('kepler', server.message)
+
 
 if __name__ == '__main__':
 	unittest.main()

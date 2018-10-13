@@ -60,7 +60,7 @@ class Connector:
 
 	def getWrapper(self):
 		
-		def packOrigin(original, handler, transfer = False):
+		def packOrigin(original, handler, transfer):
 
 			toTransfer, original = (True, transfer) if callable(transfer) else (transfer, original)
 
@@ -79,9 +79,10 @@ class Connector:
 
 		return packOrigin
 
-	def connect(self, instanceA, methodA, instanceB, methodB):
-		sender = self.getWrapper()(methodA, methodB)
+	def connect(self, instanceA, methodA, instanceB, methodB, transfer = False):
+		sender = self.getWrapper()(methodA, methodB, transfer)
 		exec('locals()["instanceA"].{0} = sender'.format(methodA.__name__))
+		self.instance, self.original = instanceA, methodA
 
 	def disconnect(self):
 		instance = self.instance
@@ -126,13 +127,28 @@ class CallWpapper():
 	def unsubscribe(self, *subscribers):
 		self.subscribers.difference_update(subscribers)
 
-	def disconnect(self):
-		self.callConnect = self.undoFirstConnection
-		self.connected = set((self.wrapped,))
-		self.subscribers = set()
+
+	def findConnection(self, handler):
+		return set((conn for conn in self.connected if conn.handler == handler))
+
+	def disconnect(self, *args, connectionType = None):
+
+		if args:
+			connected = reduce(lambda e, q: q.update(q), (handler for handler in self.findConnection(handler) in handler != set()), set())
+			self.connected.difference_update(connected)
+			self.subscribers.difference_update(args)
+
+		else: 
+			self.connected = set()
+			self.subscribers = set()
+
+		if len(self.connected) + len(self.subscribers):
+
+			self.callConnect = self.undoFirstConnection
+			self.call = self.wrapped
 
 	def callConnections(self, *args, **kwargs):
-		for wrapped in self.connected:
+		for wrapped in (conn.wrapped for conn in self.connected):
 			wrapped(*args, **kwargs)
 
 	def callSubscribers(self, *args, **kwargs):
@@ -153,7 +169,8 @@ class CallWpapper():
 		return self
 
 	def _connect(self, handler, transfer):
-		self.connected.add(self.connector.getWrapper()(self.wrapped, handler, transfer))
+		createConnection = lambda wrapped, handler, transfer: (self.connector.getWrapper()(wrapped, handler, transfer), handler, transfer)
+		self.connected.add(self.connection(*createConnection(self.wrapped, handler, transfer)))
 		return self
 
 	def bind(self, method):
@@ -203,7 +220,4 @@ class CallTransferDescriptor():
 	def __set__(self, instance, value):
 		self.toRegister(instance)
 		self.register.getWrapped(instance).update(value, False)
-
-	def __call__(self, *args, **kwargs):
-		return self.wrapped(*args, **kwargs)
 

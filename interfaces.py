@@ -8,17 +8,21 @@ class InterfaceError(Exception):
 		self.formatMessage = formatMessage
 		self.args = args
 
-	@property
+	@classmethod
 	def defaulfException(self):
 		return ConnectorError()
 
-	@property
+	@classmethod
 	def notImplement(self):
 		return ConnectorError('Not implement')
 
-	@property
+	@classmethod
 	def extInterfaceError(self, _class):
 		return InterfaceError('Can\'t extend the interface, the passed class is not an interface {0}', _class)
+	
+	@classmethod
+	def notCompability(self, *classes):
+		return InterfaceError('dfdsfdsf', *classes)
 	
 	def __str__(self):
 		return formatMessage.format(args)
@@ -183,6 +187,7 @@ class IInterface:
 	def getSlaveInterfaceRules(self):
 		if not self.haveAttr('interfaceMasterRules'):
 			self.interfaceMasterRules = dict()
+
 	
 
 	@classmethod
@@ -230,6 +235,7 @@ class IInterface:
 	masterRules = property(getMasterInterfaceRules, appendMasterInterfaceRules)
 	slaveRules = property(getSlaveInterfaceRules, appendSlaveInterfaceRules)
 	simmetricRules = property(getRules, appendInterfaceRules)
+	#transferRules = property(getTransferRules, setTransferRules)
 	typeInstance = property(getInstanceTypeControlByInterface, appendInstanceTypeControlByInterface)
 
 
@@ -238,81 +244,87 @@ class InterfaceConnector():
 	def __init__(self):
 		self.instances = dict()
 		self.connector = Connector()
+		self.interfaceConnection = namedtuple('connection', 'instance interface')
 
 	def transfer(self, instance):
 
 		try:
-			instance.implemented		
+			instance.implemented
+			instance._sys_interfacesKeys		
 		except AttributeError as e:
+			instance._sys_interfacesKeys = dict()
 			instance.implemented = dict()
-			for key in (str(_class) for _class in instance.interfacesSet):
-				instance.implemented[key] = False
-				if str(instance.__class__) not in instance.__dict__:
-					instance.__dict__[str(instance.__class__)] = dict()
+
 		return instance
 
 
 	def connectBySpecific(self, instanceA, instanceB, *interfaces):
 
 		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
-		
 		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)		
 
+	def dictInit(self, _dict, key, default = dict()):
+		_dict[key] = _dict[key] if key in _dict else default
 
 	def connect(self, instanceA, instanceB):
 
-		self.checkInterfaceCompatibility(instanceA.__class__, instanceB.__class__, IInterface)
-
+		interfaces = self.checkCompatibility(instanceA, instanceB)
 		instanceA, instanceB = self.transfer(instanceA), self.transfer(instanceB)
+		self.dictInit(instanceA._sys_interfacesKeys, instanceB)
+		self.dictInit(instanceB._sys_interfacesKeys, instanceA)
+		self.mergeByInterfaces(instanceA, instanceB, *interfaces)
 
-		getInterfaces = lambda k: set((interface if not interface.isDifferent else interface.Parent() for interface in k.interfacesSet))
-
-		interfaces = getInterfaces(instanceA).intersection(getInterfaces(instanceB))
-
-		if not len(interfaces):
-			raise(ConnectorError('Compatibility interfaces not found', (instanceA, instanceB), 'Classes'))
-		
-		self.instances[' '.join(str(instanceA) + str(time.time()))] = {'self' : instanceA}
-		self.instances[' '.join(str(instanceB) + str(time.time()))] = {'self' : instanceB}	
+	def mergeByInterfaces(self, instanceA, instanceB, *interfaces):
 
 		for interface in interfaces:
 			if instanceA.connectionIsAllowed(instanceB.__class__, interface) and instanceB.connectionIsAllowed(instanceA.__class__, interface):
 				self.mergeByInterface(instanceA, instanceB, interface)
 
+	def getInterfaces(self, instance):
+
+		try:
+			return set((interface if not interface.isDifferent else interface.Parent() for interface in instance.interfacesSet))
+		except AttributeError as e:
+			return set()
 
 	def mergeByInterface(self, instanceA, instanceB, interface):
 
-		instanceA.implemented[str(interface)] = True
-		instanceB.implemented[str(interface)] = True
-
 		for sender, reciever in interface.simmetricRules.items():
-			self._connect(instanceA, instanceB, sender, reciever)
-			self._connect(instanceB, instanceA, sender, reciever)
+			self._connect(instanceA, instanceB, sender, reciever, interface)
+			self._connect(instanceB, instanceA, sender, reciever, interface)
 
 		if instanceA.isDifferent:
 			if instanceA.typeControl() != instanceB.typeControl():
 				master = instanceA if instanceA.typeControl() == instanceA.master else instanceB
 				slave = instanceA if instanceA.typeControl() == instanceA.slave else instanceB
 				for sender, reciever in interface.masterRules.items():
-					self._connect(master, slave, sender, reciever)
+					self._connect(master, slave, sender, reciever, interface)
 				for sender, reciever in interface.slaveRules.items():
-					self._connect(slave, master, sender, reciever)
+					self._connect(slave, master, sender, reciever, interface)
 
 
-	def _connect(self, instanceA, instanceB, nameFuncA, nameFuncB):
+	def _connect(self, instanceA, instanceB, nameFuncA, nameFuncB, interfaceKey, transfer = False):
 
 		sender, reciever = eval('instanceA.' + nameFuncA), eval('instanceB.' + nameFuncB)
-		self.connector.connect(instanceA, sender, instanceB, reciever)
+		connector = Connector()
+		connector.connect(instanceA, sender, instanceB, reciever, transfer)
+		self.dictInit(instanceA._sys_interfacesKeys[instanceB], interfaceKey, set())
+		instanceA._sys_interfacesKeys[instanceB][interfaceKey].add(connector)
 
-	def checkInterfaceCompatibility(self, classA, classB, interface):
-		
-		for i in ((issubclass(classA, interface), classA), (issubclass(classB, interface), classB)):
-		 	if not i[0]:
-		 		raise(ConnectorError('Interface {0} not found'.format(interface), i[1], 'Class'))
+	def checkCompatibility(self, instanceA, instanceB):
 
-	def disconnect(self):
-		pass
+		interfaces = self.getInterfaces(instanceA).intersection(self.getInterfaces(instanceB))
 
-	def __del__(self):
-		self.disconnect()
+		if not len(interfaces):
+			raise ConnectorError('Compatibility interfaces not found', (instanceA, instanceB), 'Classes')
+
+		return interfaces
+
+
+	def disconnect(self, instanceA, instanceB):
+		if instanceB in instanceA._sys_interfacesKeys:
+			for key, value in instanceA._sys_interfacesKeys[instanceB].items():
+				next(map(lambda e: e.disconnect(), value))
+
+
 

@@ -74,13 +74,13 @@ class ConnectorTests(unittest.TestCase):
 		self.assertEqual('alpha', b.value)
 		a.iSender.disconnect()
 
-		b.value = 'beta'
+		b.setValue('beta')
 		a.iSender.connect(b.iReader)
 		a.iSender.disconnect()
 		a.iSender('alpha')
 		self.assertEqual('beta', b.value, 'check disconnect')
 
-		b.value = 'beta'
+		b.setValue('beta')
 		a.iSender.connect(b.iReader, transfer = True)
 		a.iSender('alpha')
 		self.assertEqual('alpha_gamma', b.value)
@@ -89,7 +89,7 @@ class ConnectorTests(unittest.TestCase):
 		def logger(value):
 			return value + '_log'
 
-		b.value = 'beta'
+		b.setValue('beta')
 		a.iSender.connect(b.iReader, transfer = logger)
 		a.iSender('alpha')
 		self.assertEqual('alpha_log', b.value)
